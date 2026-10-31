@@ -17,8 +17,13 @@ Kotlin with Jetpack Compose (Material 3). The app talks to LOKI's documented
 3. For each server folder, choose **Choose a folder on this device** and pick
    the local directory, for example `RetroArch/saves`.
 
-The app syncs when you open it, when you press **Sync now**, and every 15
-minutes in the background while online (WorkManager).
+While the app is open it syncs as soon as anything changes. It holds one
+request open to the server, which answers the moment another device changes a
+folder, and checks the mapped directories every few seconds for saves that
+have stopped changing. Turn on **Live sync in background** (in the menu) to
+keep doing that after the app closes. It runs as a foreground service with a
+notification, which you can turn off from the notification. Otherwise the
+app syncs every 15 minutes in the background while online (WorkManager).
 
 ## How syncing works
 

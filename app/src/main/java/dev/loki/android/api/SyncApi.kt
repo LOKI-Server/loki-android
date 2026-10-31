@@ -25,6 +25,8 @@ data class Folder(val id: String, val name: String, val kind: String, val keepVe
 data class RemoteChange(val path: String, val version: Long, val hash: String?, val size: Long, val mtime: Long, val seq: Long)
 data class Feed(val seq: Long, val more: Boolean, val reset: Boolean, val changes: List<RemoteChange>)
 data class Quota(val used: Long, val limit: Long, val maxFileBytes: Long)
+/** Every folder's sequence number, and a token that changes whenever any does. */
+data class Watch(val state: String, val changed: Boolean, val folders: Map<String, Long>)
 
 /** One change sent in a commit. A null [hash] deletes the path. */
 data class LocalChange(val path: String, val baseVersion: Long, val hash: String?, val size: Long, val mtime: Long)
@@ -104,6 +106,14 @@ class SyncApi(baseUrl: String, private val token: String? = null) {
             o.optBoolean("reset"),
             (0 until list.length()).map { change(list.getJSONObject(it))!! },
         )
+    }
+
+    /** Waits up to [wait] seconds for any folder to differ from [state] (empty: answer at once). */
+    fun watch(state: String, wait: Int): Watch {
+        val o = json("GET", "/sync/v1/watch?wait=$wait&state=${enc(state)}")
+        val list = o.getJSONArray("folders")
+        val folders = (0 until list.length()).associate { list.getJSONObject(it).let { f -> f.getString("id") to f.getLong("seq") } }
+        return Watch(o.getString("state"), o.optBoolean("changed"), folders)
     }
 
     fun hasBlob(hash: String): Boolean {

@@ -1,6 +1,8 @@
 package dev.loki.android.ui
 
+import android.Manifest
 import android.net.Uri
+import android.os.Build
 import android.provider.DocumentsContract
 import android.text.format.DateUtils
 import android.text.format.Formatter
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -68,6 +71,10 @@ fun FoldersScreen(model: AppViewModel) {
     var menu by rememberSaveable { mutableStateOf(false) }
     // The folder whose local directory is being chosen, kept across the picker.
     var choosing by rememberSaveable { mutableStateOf<String?>(null) }
+    // The live-sync notification needs permission on Android 13+; live sync works either way.
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        model.changeLiveInBackground(true)
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         val folder = choosing
         choosing = null
@@ -89,6 +96,18 @@ fun FoldersScreen(model: AppViewModel) {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("New server folder") }, onClick = { menu = false; creating = true })
+                        DropdownMenuItem(
+                            text = { Text("Live sync in background") },
+                            trailingIcon = { Checkbox(checked = model.liveInBackground, onCheckedChange = null) },
+                            onClick = {
+                                menu = false
+                                when {
+                                    model.liveInBackground -> model.changeLiveInBackground(false)
+                                    Build.VERSION.SDK_INT >= 33 -> notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    else -> model.changeLiveInBackground(true)
+                                }
+                            },
+                        )
                         DropdownMenuItem(text = { Text("Sign out this device") }, onClick = { menu = false; model.signOut() })
                     }
                 },
@@ -109,7 +128,8 @@ fun FoldersScreen(model: AppViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Text(
-                            "${Formatter.formatShortFileSize(context, q.used)} of ${Formatter.formatShortFileSize(context, q.limit)} used on the server, including history",
+                            "${Formatter.formatShortFileSize(context, q.used)} of ${Formatter.formatShortFileSize(context, q.limit)} used on the server, including history" +
+                                if (model.liveInBackground) " · live sync on" else "",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

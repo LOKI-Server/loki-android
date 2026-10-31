@@ -27,6 +27,11 @@ class Store(context: Context) {
     val displayName: String get() = prefs.getString("display_name", "") ?: ""
     val signedIn: Boolean get() = server != null && token != null
 
+    /** Whether live sync keeps running in the background after the app closes. */
+    var live: Boolean
+        get() = prefs.getBoolean("live", false)
+        set(value) = prefs.edit().putBoolean("live", value).apply()
+
     fun api(): SyncApi = SyncApi(server ?: error("No server configured."), token)
 
     fun signIn(server: String, session: Session) {

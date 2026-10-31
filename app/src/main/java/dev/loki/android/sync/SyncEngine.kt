@@ -11,6 +11,7 @@ import dev.loki.android.data.Mapping
 import dev.loki.android.data.Store
 import dev.loki.android.data.SyncIndex
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -57,11 +58,31 @@ class SyncEngine(private val context: Context, private val store: Store) {
     suspend fun syncAll(): Map<String, Outcome> = lock.withLock {
         withContext(Dispatchers.IO) {
             store.mappings().associate { it.folderId to syncRecording(it) }
-        }
+        }.also { synced.value++ }
     }
 
     suspend fun sync(folderId: String): Outcome? = lock.withLock {
         withContext(Dispatchers.IO) { store.mapping(folderId)?.let { syncRecording(it) } }
+            .also { synced.value++ }
+    }
+
+    /**
+     * Whether any mapped folder has a settled local change since its last sync:
+     * a file added, removed, or with a new size or mtime. Only lists directories,
+     * so it is cheap enough to ask every few seconds.
+     */
+    suspend fun localChanges(): Boolean = withContext(Dispatchers.IO) {
+        if (lock.isLocked) return@withContext false
+        val now = System.currentTimeMillis()
+        store.mappings().any { mapping ->
+            runCatching {
+                val index = SyncIndex.load(store.indexFile(mapping.folderId))
+                val local = LocalTree(context.contentResolver, mapping.treeUri).scan()
+                val settled = local.values.filter { now - it.mtime >= SETTLE_MS }
+                settled.any { file -> index.entries[file.path].let { it?.hash == null || it.size != file.size || it.mtime != file.mtime } } ||
+                    index.entries.any { (path, e) -> e.hash != null && path !in local }
+            }.getOrDefault(false)
+        }
     }
 
     private fun syncRecording(mapping: Mapping): Outcome {
@@ -250,5 +271,8 @@ class SyncEngine(private val context: Context, private val store: Store) {
         /** Emulators write saves in bursts; wait until a file has been still this long. */
         const val SETTLE_MS = 3_000L
         private val lock = Mutex()
+
+        /** Counts finished syncs, wherever they ran, so the screen can show the results. */
+        val synced = MutableStateFlow(0L)
     }
 }

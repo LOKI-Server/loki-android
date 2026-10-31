@@ -32,6 +32,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        model.appVisible()
+    }
+
+    override fun onStop() {
+        model.appHidden()
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
         if (model.signedIn) model.refresh()

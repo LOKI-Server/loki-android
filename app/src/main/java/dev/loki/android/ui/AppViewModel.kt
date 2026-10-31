@@ -17,6 +17,8 @@ import dev.loki.android.api.Session
 import dev.loki.android.api.SyncApi
 import dev.loki.android.data.Mapping
 import dev.loki.android.data.Store
+import dev.loki.android.sync.LiveSync
+import dev.loki.android.sync.LiveSyncService
 import dev.loki.android.sync.SyncEngine
 import dev.loki.android.sync.SyncWorker
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +57,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var syncing by mutableStateOf<String?>(null)
         private set
+    var liveInBackground by mutableStateOf(store.live)
+        private set
+    private var live: Job? = null
 
     private val deviceName = listOf(Build.MANUFACTURER, Build.MODEL)
         .filter { it.isNotBlank() }
@@ -63,6 +68,40 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         if (signedIn) refresh()
+        // Show results of syncs that ran anywhere: live sync, the worker, or a button.
+        viewModelScope.launch {
+            SyncEngine.synced.collect { mappings = store.mappings().associateBy { it.folderId } }
+        }
+    }
+
+    /**
+     * While the app is on screen it syncs as soon as anything changes. With live
+     * sync in the background on, the foreground service does that instead.
+     */
+    fun appVisible() {
+        if (!signedIn) return
+        if (store.live) {
+            LiveSyncService.start(getApplication())
+        } else if (live == null) {
+            live = LiveSync(getApplication(), store).start(viewModelScope)
+        }
+    }
+
+    fun appHidden() {
+        live?.cancel()
+        live = null
+    }
+
+    fun changeLiveInBackground(on: Boolean) {
+        store.live = on
+        liveInBackground = on
+        if (on) {
+            appHidden()
+            LiveSyncService.start(getApplication())
+        } else {
+            LiveSyncService.stop(getApplication())
+            appVisible()
+        }
     }
 
     private fun work(block: suspend () -> Unit) {
@@ -134,6 +173,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         signedIn = true
         SyncWorker.schedule(getApplication())
         refresh()
+        appVisible()
     }
 
     fun refresh() = work {
@@ -192,6 +232,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun signOut() = work {
         runCatching { withContext(Dispatchers.IO) { store.api().signOut() } }
+        appHidden()
+        LiveSyncService.stop(getApplication())
+        liveInBackground = false
         for (mapping in store.mappings()) unmap(mapping.folderId)
         store.signOut()
         SyncWorker.cancel(getApplication())
