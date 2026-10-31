@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A world-tree glyph: a trunk with three branches, in LOKI green. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:strokeColor="@color/loki_green"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M54,78 L54,32 M54,48 L40,34 M54,48 L68,34 M54,62 L42,52 M54,62 L66,52 M44,78 L64,78" />
+</vector>

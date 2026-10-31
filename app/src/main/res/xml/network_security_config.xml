@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LOKI servers are normally HTTPS. Plain HTTP is allowed so a server on the
+     local network (or an emulator's 10.0.2.2) can be used during setup. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

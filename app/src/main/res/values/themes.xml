@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.Loki" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/loki_bg</item>
+        <item name="android:statusBarColor">@color/loki_bg</item>
+        <item name="android:navigationBarColor">@color/loki_bg</item>
+    </style>
+</resources>
