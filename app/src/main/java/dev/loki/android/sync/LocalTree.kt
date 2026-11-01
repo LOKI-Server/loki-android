@@ -52,6 +52,41 @@ class LocalTree(private val resolver: ContentResolver, private val tree: Uri) {
         for ((path, id) in found) walk(path, id)
     }
 
+    /**
+     * The file at [path] as the provider reports it right now, ignoring the scan
+     * cache, or null if there is none. Used to notice saves written mid-sync.
+     */
+    fun current(path: String): LocalFile? {
+        var parent = rootId
+        val parts = path.split('/')
+        for ((i, part) in parts.withIndex()) {
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parent)
+            val columns = arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE, Document.COLUMN_LAST_MODIFIED)
+            var next: String? = null
+            resolver.query(children, columns, null, null, null)?.use { c ->
+                while (c.moveToNext()) {
+                    val name = Normalizer.normalize(c.getString(1) ?: continue, Normalizer.Form.NFC)
+                    if (name != part) continue
+                    val directory = c.getString(2) == Document.MIME_TYPE_DIR
+                    if (i == parts.lastIndex) {
+                        return if (directory) null else LocalFile(path, DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)), c.getLong(3), c.getLong(4))
+                    }
+                    if (directory) next = c.getString(0)
+                    break
+                }
+            }
+            parent = next ?: return null
+        }
+        return null
+    }
+
+    /** A known file's size and mtime right now, or null if it is gone. */
+    fun stat(file: LocalFile): LocalFile? = runCatching {
+        resolver.query(file.uri, arrayOf(Document.COLUMN_SIZE, Document.COLUMN_LAST_MODIFIED), null, null, null)?.use { c ->
+            if (c.moveToFirst()) file.copy(size = c.getLong(0), mtime = c.getLong(1)) else null
+        }
+    }.getOrNull()
+
     fun open(file: LocalFile): InputStream =
         resolver.openInputStream(file.uri) ?: error("Cannot read ${file.path}.")
 

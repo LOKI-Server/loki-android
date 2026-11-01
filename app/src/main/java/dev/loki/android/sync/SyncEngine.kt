@@ -119,6 +119,7 @@ class SyncEngine(private val context: Context, private val store: Store) {
 
         // 1. Scan.
         var local = tree.scan()
+        run.local = local
         val now = System.currentTimeMillis()
         val hashes = mutableMapOf<String, String>()
         val dirty = mutableSetOf<String>()
@@ -163,6 +164,8 @@ class SyncEngine(private val context: Context, private val store: Store) {
                         if (change.hash == null) index.entries[path] = Entry(change.version, null, 0, 0) else run.download(change)
                     }
                     else -> when {
+                        // A save written since the scan outlives the deletion; the next pass sends it.
+                        change.hash == null && run.changedSinceScan(path) -> Unit
                         change.hash == null -> {
                             if (path in local) {
                                 tree.delete(path)
@@ -180,6 +183,7 @@ class SyncEngine(private val context: Context, private val store: Store) {
             index.save(indexFile)
         } while (feed.more)
         local = tree.scan()
+        run.local = local
 
         // 3. Push.
         val overwrite = mutableListOf<LocalChange>()
@@ -240,6 +244,8 @@ class SyncEngine(private val context: Context, private val store: Store) {
     }
 
     private class Run(val api: SyncApi, val tree: LocalTree, val index: SyncIndex, val cache: File) {
+        /** The directory as last scanned; a download may only replace what this describes. */
+        var local: Map<String, LocalFile> = emptyMap()
         var downloaded = 0
         var uploaded = 0
         var removed = 0
@@ -250,6 +256,13 @@ class SyncEngine(private val context: Context, private val store: Store) {
          * Writes a server version locally. It is received into the app's cache and
          * checked against its hash first, so a damaged transfer never touches a save.
          */
+        /** Whether an emulator saved, created, or removed [path] since the last scan. */
+        fun changedSinceScan(path: String): Boolean {
+            val seen = local[path] ?: return tree.current(path) != null
+            val now = tree.stat(seen) ?: return true
+            return now.size != seen.size || now.mtime != seen.mtime
+        }
+
         fun download(change: RemoteChange) {
             val hash = change.hash ?: return
             val staged = File.createTempFile("blob", null, cache)
@@ -258,6 +271,9 @@ class SyncEngine(private val context: Context, private val store: Store) {
                 api.downloadBlob(hash) { input -> staged.outputStream().use { DigestInputStream(input, digest).copyTo(it, 64 * 1024) } }
                 val received = digest.digest().joinToString("") { "%02x".format(it) }
                 if (received != hash) throw IOException("${change.path} arrived damaged; it will be fetched again.")
+                // Never replace a save written mid-sync: the next pass resolves it as
+                // a conflict. Checked at the last moment, leaving only a brief window.
+                if (changedSinceScan(change.path)) return
                 val file = tree.write(change.path) { out -> staged.inputStream().use { it.copyTo(out, 64 * 1024) } }
                 index.entries[change.path] = Entry(change.version, hash, file.size, file.mtime)
                 downloaded++
