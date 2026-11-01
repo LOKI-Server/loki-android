@@ -1,7 +1,7 @@
 # LOKI for Android
 
 Keeps folders on an Android device — emulator saves on an AYN Thor, Retroid, or
-phone — in step with a [LOKI](https://github.com/Aspenini/LOKI) server's
+phone — in step with a [LOKI](https://github.com/LOKI-Server/LOKI) server's
 **Save sync**. Every earlier version stays on your server, so a bad save or a
 clash between devices can always be undone from the LOKI dashboard.
 
