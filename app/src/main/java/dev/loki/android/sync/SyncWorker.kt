@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val store = Store(applicationContext)
-        if (!store.signedIn) return Result.success()
+        if (!store.signedIn || !store.canSync) return Result.success()
         SyncEngine(applicationContext, store).syncAll()
         return Result.success()
     }

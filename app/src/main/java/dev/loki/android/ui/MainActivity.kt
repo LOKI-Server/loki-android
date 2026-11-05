@@ -12,11 +12,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
     private val model: AppViewModel by viewModels()
+    private val files: FilesViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,7 +27,10 @@ class MainActivity : ComponentActivity() {
             LokiTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(Modifier.safeDrawingPadding()) {
-                        if (model.signedIn) FoldersScreen(model) else ConnectScreen(model)
+                        if (model.signedIn) FoldersScreen(model) { files.open(model.serverUrl) }
+                        else ConnectScreen(model) { files.open(model.server) }
+                        if (files.visible) FilesDialog(files)
+                        LaunchedEffect(files.visible) { if (!files.visible) model.accountChanged() }
                     }
                 }
             }

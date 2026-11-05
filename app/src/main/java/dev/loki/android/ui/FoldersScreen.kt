@@ -66,7 +66,7 @@ private val kinds = linkedMapOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FoldersScreen(model: AppViewModel) {
+fun FoldersScreen(model: AppViewModel, onBrowseFiles: () -> Unit) {
     var creating by rememberSaveable { mutableStateOf(false) }
     var menu by rememberSaveable { mutableStateOf(false) }
     // The folder whose local directory is being chosen, kept across the picker.
@@ -85,19 +85,21 @@ fun FoldersScreen(model: AppViewModel) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Save sync")
+                        Text("LOKI Client")
                         Text("${model.displayName} · ${Uri.parse(model.serverUrl).host ?: model.serverUrl}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
-                    IconButton(onClick = { model.syncNow() }, enabled = model.syncing == null) {
+                    IconButton(onClick = { model.syncNow() }, enabled = model.syncing == null && model.canSync) {
                         if (model.syncing == "all") CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Icon(Icons.Default.Refresh, "Sync everything now")
                     }
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("New server folder") }, onClick = { menu = false; creating = true })
+                        DropdownMenuItem(text = { Text("Browse files…") }, onClick = { menu = false; onBrowseFiles() })
+                        DropdownMenuItem(text = { Text("New server folder") }, onClick = { menu = false; creating = true }, enabled = model.canSync)
                         DropdownMenuItem(
                             text = { Text("Live sync in background") },
+                            enabled = model.canSync,
                             trailingIcon = { Checkbox(checked = model.liveInBackground, onCheckedChange = null) },
                             onClick = {
                                 menu = false
@@ -137,7 +139,8 @@ fun FoldersScreen(model: AppViewModel) {
                 }
             }
             model.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-            if (model.folders.isEmpty() && !model.busy) {
+            if (!model.canSync) item { Text("Your account does not have access to Save sync. Use Browse files in the app menu to download shared files.") }
+            if (model.canSync && model.folders.isEmpty() && !model.busy) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("No sync folders yet", style = MaterialTheme.typography.titleMedium)
@@ -160,7 +163,7 @@ fun FoldersScreen(model: AppViewModel) {
                 )
             }
             item {
-                OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { creating = true }, enabled = model.canSync, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Add, null)
                     Spacer(Modifier.width(8.dp))
                     Text("New server folder")

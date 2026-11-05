@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import dev.loki.android.api.Session
 import dev.loki.android.api.SyncApi
+import dev.loki.android.api.FilesApi
 import org.json.JSONObject
 import java.io.File
 
@@ -19,8 +20,23 @@ data class Mapping(
 /** The signed-in account and folder mappings. Kept in app-private storage. */
 class Store(context: Context) {
     private val prefs = context.getSharedPreferences("loki", Context.MODE_PRIVATE)
+    private val legacyPrefs = context.getSharedPreferences("loki_files", Context.MODE_PRIVATE)
     private val indexes = File(context.filesDir, "index").apply { mkdirs() }
 
+    init {
+        val legacy = context.getSharedPreferences("loki_files", Context.MODE_PRIVATE)
+        if (prefs.getString("token", null).isNullOrEmpty() && !legacy.getString("token", null).isNullOrEmpty()) {
+            prefs.edit().putString("server", legacy.getString("server", null))
+                .putString("token", legacy.getString("token", null))
+                .putString("username", legacy.getString("username", ""))
+                .putString("display_name", legacy.getString("username", ""))
+                .putBoolean("can_sync", legacy.getBoolean("can_sync", true)).apply()
+            legacy.edit().clear().apply()
+        }
+    }
+    var canSync: Boolean
+        get() = prefs.getBoolean("can_sync", true)
+        set(value) = prefs.edit().putBoolean("can_sync", value).apply()
     val server: String? get() = prefs.getString("server", null)
     val token: String? get() = prefs.getString("token", null)
     val username: String get() = prefs.getString("username", "") ?: ""
@@ -32,6 +48,8 @@ class Store(context: Context) {
         get() = prefs.getBoolean("live", false)
         set(value) = prefs.edit().putBoolean("live", value).apply()
 
+    fun filesApi() = FilesApi(server ?: error("No server configured."), token)
+
     fun api(): SyncApi = SyncApi(server ?: error("No server configured."), token)
 
     fun signIn(server: String, session: Session) {
@@ -40,11 +58,13 @@ class Store(context: Context) {
             .putString("token", session.token)
             .putString("username", session.username)
             .putString("display_name", session.displayName)
+            .putBoolean("can_sync", session.canSync)
             .apply()
     }
 
     fun signOut() {
         prefs.edit().clear().apply()
+        legacyPrefs.edit().clear().apply()
         indexes.listFiles()?.forEach { it.delete() }
     }
 

@@ -7,6 +7,6 @@ import dev.loki.android.sync.SyncWorker
 class LokiApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        if (Store(this).signedIn) SyncWorker.schedule(this)
+        if (Store(this).let { it.signedIn && it.canSync }) SyncWorker.schedule(this)
     }
 }

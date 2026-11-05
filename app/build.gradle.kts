@@ -40,4 +40,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     testImplementation(libs.junit)
+    // Real JSON implementation for HTTP client tests on the JVM.
+    testImplementation("org.json:json:20240303")
 }

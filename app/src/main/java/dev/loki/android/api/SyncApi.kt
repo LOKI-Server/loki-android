@@ -20,7 +20,7 @@ data class Pairing(
     val interval: Int,
     val expiresIn: Int,
 )
-data class Session(val token: String, val deviceId: String, val username: String, val displayName: String)
+data class Session(val token: String, val deviceId: String, val username: String, val displayName: String, val canSync: Boolean = true)
 data class Folder(val id: String, val name: String, val kind: String, val keepVersions: Int, val seq: Long)
 data class RemoteChange(val path: String, val version: Long, val hash: String?, val size: Long, val mtime: Long, val seq: Long)
 data class Feed(val seq: Long, val more: Boolean, val reset: Boolean, val changes: List<RemoteChange>)
@@ -47,12 +47,12 @@ class SyncApi(baseUrl: String, private val token: String? = null) {
     val base: String = normalize(baseUrl)
 
     fun discover(): Discovery {
-        val o = json("GET", "/sync/v1")
+        val o = json("GET", "/auth/v1")
         return Discovery(o.optString("name", "LOKI"), o.optInt("protocol"), o.optLong("max_file_bytes"))
     }
 
     fun pair(deviceName: String, platform: String): Pairing {
-        val o = json("POST", "/sync/v1/pair", JSONObject().put("name", deviceName).put("platform", platform))
+        val o = json("POST", "/auth/v1/pair", JSONObject().put("name", deviceName).put("platform", platform))
         return Pairing(
             o.getString("device_code"),
             o.getString("user_code"),
@@ -65,7 +65,7 @@ class SyncApi(baseUrl: String, private val token: String? = null) {
 
     /** Null while the code is still waiting for approval in the dashboard. */
     fun poll(deviceCode: String): Session? = try {
-        session(json("POST", "/sync/v1/pair/poll", JSONObject().put("device_code", deviceCode)))
+        session(json("POST", "/auth/v1/pair/poll", JSONObject().put("device_code", deviceCode)))
     } catch (e: ApiException) {
         if (e.code == "authorization_pending" || e.code == "slow_down") null else throw e
     }
@@ -73,11 +73,13 @@ class SyncApi(baseUrl: String, private val token: String? = null) {
     fun login(username: String, password: String, code: String, deviceName: String, platform: String): Session =
         session(
             json(
-                "POST", "/sync/v1/login",
+                "POST", "/auth/v1/login",
                 JSONObject().put("username", username).put("password", password).put("code", code)
                     .put("name", deviceName).put("platform", platform),
             ),
         )
+
+    fun syncAccess(): Boolean = json("GET", "/auth/v1/me").getJSONObject("access").getBoolean("sync")
 
     fun quota(): Quota {
         val o = json("GET", "/sync/v1/me")
@@ -86,7 +88,7 @@ class SyncApi(baseUrl: String, private val token: String? = null) {
     }
 
     fun signOut() {
-        json("DELETE", "/sync/v1/device")
+        json("DELETE", "/auth/v1/device")
     }
 
     fun folders(): List<Folder> {
@@ -185,6 +187,7 @@ class SyncApi(baseUrl: String, private val token: String? = null) {
             o.getJSONObject("device").getString("id"),
             user.getString("username"),
             user.optString("display_name", user.getString("username")),
+            o.optJSONObject("access")?.optBoolean("sync", true) ?: true,
         )
     }
 

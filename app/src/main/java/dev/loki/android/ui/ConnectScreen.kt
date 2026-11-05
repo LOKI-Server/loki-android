@@ -20,6 +20,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,14 +43,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun ConnectScreen(model: AppViewModel) {
+fun ConnectScreen(model: AppViewModel, onBrowseFiles: () -> Unit) {
+    var menu by rememberSaveable { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(Modifier.widthIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Spacer(Modifier.height(24.dp))
-            Text("LOKI · Save sync", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("LOKI Client", Modifier.weight(1f), color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelLarge)
+                androidx.compose.foundation.layout.Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "App menu") }
+                    DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("Browse files…") }, onClick = { menu = false; onBrowseFiles() })
+                    }
+                }
+            }
             Text("Connect to LOKI", style = MaterialTheme.typography.headlineMedium)
             Text(
                 "Keep emulator saves and other folders the same on every device, with every earlier version kept on your server.",
@@ -129,7 +144,7 @@ private fun PairingStep(model: AppViewModel, code: String) {
             Text("Approve this code in LOKI", style = MaterialTheme.typography.titleMedium)
             Text(code, fontSize = 40.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Text(
-                "Open Save sync → Pair a device in the dashboard on any signed-in browser, or open the approval page here.",
+                "Open Account → Devices → Pair a device in the dashboard on any signed-in browser, or open the approval page here.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -17,6 +17,7 @@ import dev.loki.android.api.Session
 import dev.loki.android.api.SyncApi
 import dev.loki.android.data.Mapping
 import dev.loki.android.data.Store
+import dev.loki.android.data.FileStore
 import dev.loki.android.sync.LiveSync
 import dev.loki.android.sync.LiveSyncService
 import dev.loki.android.sync.SyncEngine
@@ -32,6 +33,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val engine = SyncEngine(app, store)
 
     var signedIn by mutableStateOf(store.signedIn)
+        private set
+    var canSync by mutableStateOf(store.canSync)
         private set
     var busy by mutableStateOf(false)
         private set
@@ -79,7 +82,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * sync in the background on, the foreground service does that instead.
      */
     fun appVisible() {
-        if (!signedIn) return
+        if (!signedIn || !canSync) return
         if (store.live) {
             LiveSyncService.start(getApplication())
         } else if (live == null) {
@@ -171,13 +174,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.signIn(server, session)
         pairing = null
         signedIn = true
-        SyncWorker.schedule(getApplication())
+        canSync = store.canSync
+        if (canSync) SyncWorker.schedule(getApplication())
         refresh()
         appVisible()
     }
 
     fun refresh() = work {
         val api = store.api()
+        val wasAllowed = canSync
+        canSync = withContext(Dispatchers.IO) { api.syncAccess() }
+        store.canSync = canSync
+        if (!canSync) {
+            folders = emptyList(); quota = null; appHidden(); SyncWorker.cancel(getApplication())
+            LiveSyncService.stop(getApplication()); return@work
+        }
+        if (!wasAllowed) { SyncWorker.schedule(getApplication()); appVisible() }
         val (list, usage) = withContext(Dispatchers.IO) { api.folders() to api.quota() }
         folders = list
         quota = usage
@@ -217,7 +229,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Syncs one folder, or every mapped folder when [folderId] is null. */
     fun syncNow(folderId: String? = null) {
-        if (syncing != null) return
+        if (syncing != null || !canSync) return
         viewModelScope.launch {
             syncing = folderId ?: "all"
             try {
@@ -230,8 +242,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** File browsing and sync share the same account store. */
+    fun accountChanged() {
+        if (signedIn == store.signedIn && (!store.signedIn || server == store.server)) return
+        signedIn = store.signedIn
+        canSync = store.canSync
+        server = store.server ?: ""
+        if (signedIn) { if (canSync) SyncWorker.schedule(getApplication()); refresh(); appVisible() }
+    }
+
     fun signOut() = work {
         runCatching { withContext(Dispatchers.IO) { store.api().signOut() } }
+        val legacy = FileStore(getApplication())
+        if (legacy.signedIn && legacy.token != store.token) runCatching { withContext(Dispatchers.IO) { legacy.api().signOut() } }
         appHidden()
         LiveSyncService.stop(getApplication())
         liveInBackground = false

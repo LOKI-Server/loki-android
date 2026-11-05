@@ -35,7 +35,7 @@ class LiveSyncService : Service() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL, "Live sync", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Shown while LOKI keeps your folders in sync in the background."
+                description = "Shown while LOKI Client keeps your folders in sync in the background."
             },
         )
         ServiceCompat.startForeground(
