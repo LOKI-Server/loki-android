@@ -62,7 +62,7 @@ class Store(context: Context) {
             .apply()
     }
 
-    fun signOut() {
+    fun signOut() = synchronized(lock) {
         prefs.edit().clear().apply()
         legacyPrefs.edit().clear().apply()
         indexes.listFiles()?.forEach { it.delete() }
@@ -84,8 +84,7 @@ class Store(context: Context) {
 
     fun mapping(folderId: String): Mapping? = mappings().firstOrNull { it.folderId == folderId }
 
-    @Synchronized
-    fun saveMapping(mapping: Mapping) {
+    fun saveMapping(mapping: Mapping) = synchronized(lock) {
         val o = JSONObject(prefs.getString("mappings", "{}") ?: "{}")
         o.put(
             mapping.folderId,
@@ -95,8 +94,26 @@ class Store(context: Context) {
         prefs.edit().putString("mappings", o.toString()).apply()
     }
 
-    @Synchronized
-    fun removeMapping(folderId: String) {
+    /**
+     * Whether [mapping] is still how its folder is synced: the person may have
+     * stopped it, chosen another directory, or signed out while a sync ran.
+     */
+    fun isCurrent(mapping: Mapping): Boolean = mapping(mapping.folderId)?.treeUri == mapping.treeUri
+
+    /** Runs [block] only while [mapping] is current, so Stop or sign-out cannot interleave. */
+    fun whileCurrent(mapping: Mapping, block: () -> Unit): Boolean = synchronized(lock) {
+        if (!isCurrent(mapping)) return false
+        block()
+        true
+    }
+
+    /**
+     * Records a finished sync, but only if [mapping] is still current, so a sync
+     * that ends after Stop or sign-out never brings the folder back.
+     */
+    fun recordResult(mapping: Mapping): Boolean = whileCurrent(mapping) { saveMapping(mapping) }
+
+    fun removeMapping(folderId: String) = synchronized(lock) {
         val o = JSONObject(prefs.getString("mappings", "{}") ?: "{}")
         o.remove(folderId)
         prefs.edit().putString("mappings", o.toString()).apply()
@@ -104,4 +121,9 @@ class Store(context: Context) {
     }
 
     fun indexFile(folderId: String) = File(indexes, "${folderId.filter { it.isLetterOrDigit() || it == '-' }}.json")
+
+    private companion object {
+        /** Every Store shares one preferences file, so they share one lock too. */
+        val lock = Any()
+    }
 }

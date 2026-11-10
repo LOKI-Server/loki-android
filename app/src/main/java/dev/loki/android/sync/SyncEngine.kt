@@ -94,7 +94,7 @@ class SyncEngine(private val context: Context, private val store: Store) {
                 "unauthorized" -> "This device was signed out. Pair it again."
                 else -> e.message ?: "Sync failed."
             }
-            store.saveMapping(mapping.copy(lastSync = System.currentTimeMillis(), lastResult = message, failed = true))
+            store.recordResult(mapping.copy(lastSync = System.currentTimeMillis(), lastResult = message, failed = true))
             return Outcome(errors = listOf(message))
         } catch (e: Exception) {
             val message = when (e) {
@@ -102,10 +102,10 @@ class SyncEngine(private val context: Context, private val store: Store) {
                 is IOException -> "Could not reach the server: ${e.message}"
                 else -> e.message ?: e.toString()
             }
-            store.saveMapping(mapping.copy(lastSync = System.currentTimeMillis(), lastResult = message, failed = true))
+            store.recordResult(mapping.copy(lastSync = System.currentTimeMillis(), lastResult = message, failed = true))
             return Outcome(errors = listOf(message))
         }
-        store.saveMapping(mapping.copy(lastSync = System.currentTimeMillis(), lastResult = outcome.summary(), failed = outcome.errors.isNotEmpty()))
+        store.recordResult(mapping.copy(lastSync = System.currentTimeMillis(), lastResult = outcome.summary(), failed = outcome.errors.isNotEmpty()))
         return outcome
     }
 
@@ -115,6 +115,8 @@ class SyncEngine(private val context: Context, private val store: Store) {
         val tree = LocalTree(context.contentResolver, mapping.treeUri)
         val indexFile = store.indexFile(mapping.folderId)
         val index = SyncIndex.load(indexFile)
+        // Stopping, re-choosing, or signing out mid-sync deletes the index; never write it back.
+        fun saveIndex() { store.whileCurrent(mapping) { index.save(indexFile) } }
         val run = Run(api, tree, index, context.cacheDir)
 
         // 1. Scan.
@@ -180,7 +182,7 @@ class SyncEngine(private val context: Context, private val store: Store) {
             }
             since = feed.seq
             index.cursor = since
-            index.save(indexFile)
+            saveIndex()
         } while (feed.more)
         local = tree.scan()
         run.local = local
@@ -234,12 +236,12 @@ class SyncEngine(private val context: Context, private val store: Store) {
                         is CommitResult.Rejected -> run.errors += "${result.path}: ${result.error}"
                     }
                 }
-                index.save(indexFile)
+                saveIndex()
             }
         }
         // Overwrites that displaced a newer server version count as conflicts too.
         run.conflicts += overwrite.count { index.entries[it.path]?.version?.let { v -> v > it.baseVersion + 1 } == true }
-        index.save(indexFile)
+        saveIndex()
         return Outcome(run.downloaded, run.uploaded, run.removed, run.conflicts, run.errors)
     }
 

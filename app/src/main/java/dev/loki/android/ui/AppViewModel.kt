@@ -209,7 +209,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
         )
         val previous = store.mapping(folderId)
-        if (previous != null && previous.treeUri != tree) store.removeMapping(folderId)
+        // A new place starts a fresh index, including one left by an earlier mapping.
+        if (previous == null || previous.treeUri != tree) store.removeMapping(folderId)
         store.saveMapping(Mapping(folderId, tree))
         mappings = store.mappings().associateBy { it.folderId }
         syncNow(folderId)
