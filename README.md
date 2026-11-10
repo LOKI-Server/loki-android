@@ -75,7 +75,22 @@ Requires the Android SDK (API 36) and a JDK 17 or newer.
 ./gradlew assembleDebug
 ```
 
-The APK is written to `app/build/outputs/apk/debug/`. During development, an
+The APK is written to `app/build/outputs/apk/debug/`.
+
+For a signed release APK, put a `keystore.properties` next to `settings.gradle.kts`
+(it and `*.jks` are gitignored):
+
+```properties
+storeFile=loki-release.jks
+storePassword=…
+keyAlias=loki
+keyPassword=…
+```
+
+then run `./gradlew assembleRelease`; the APK is
+`app/build/outputs/apk/release/app-release.apk`. Without that file the release
+build is unsigned. Keep the keystore backed up: updates install over an existing
+copy only when signed with the same key. Raise `versionCode` for every release. During development, an
 emulator can reach a LOKI server on the host with `adb reverse tcp:7070 tcp:7070`
 and the address `http://127.0.0.1:7070`.
 
@@ -88,3 +103,7 @@ Run the local HTTP transfer tests and Android lint checks with:
 The tests cover browsing, encoded Unicode paths, resume, full responses to range
 requests, invalid ranges, interrupted downloads, SHA-256 failures, cancellation,
 empty files, and credential errors.
+
+## License
+
+MIT © Aspenini. See [LICENSE](LICENSE).

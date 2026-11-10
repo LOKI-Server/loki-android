@@ -5,3 +5,7 @@ local.properties
 *.iml
 .kotlin/
 captures/
+
+# Release signing: never commit, always back up.
+keystore.properties
+*.jks
