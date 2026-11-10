@@ -88,6 +88,7 @@ private fun ServerStep(model: AppViewModel) {
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
         modifier = Modifier.fillMaxWidth(),
     )
+    PlainHttpWarning(model.server)
     Button(
         onClick = model::discover,
         enabled = !model.busy && model.server.isNotBlank(),
@@ -107,6 +108,7 @@ private fun SignInStep(model: AppViewModel, serverName: String) {
             TextButton(onClick = model::forgetServer) { Text("Change") }
         }
     }
+    PlainHttpWarning(model.server)
     if (!password) {
         Text("Pair this device by approving a short code in the LOKI dashboard. Your password never touches this device.")
         Button(onClick = model::startPairing, enabled = !model.busy, modifier = Modifier.fillMaxWidth()) { Text("Pair with a code") }
@@ -134,6 +136,17 @@ private fun SignInStep(model: AppViewModel, serverName: String) {
         ) { Text("Sign in") }
         TextButton(onClick = { password = false }, modifier = Modifier.fillMaxWidth()) { Text("Pair with a code instead") }
     }
+}
+
+/** Shown for an explicit `http://` address: the sign-in and token would travel unencrypted. */
+@Composable
+fun PlainHttpWarning(address: String) {
+    if (!address.trim().startsWith("http://", ignoreCase = true)) return
+    Text(
+        "This address uses plain HTTP, so your sign-in and files travel unencrypted. Use HTTPS unless the server is on your own network.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+    )
 }
 
 @Composable

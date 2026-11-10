@@ -43,6 +43,7 @@ fun FilesDialog(model: FilesViewModel) {
                         Text("Sign in to browse shared files", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         OutlinedTextField(model.server, { model.server = it }, label = { Text("Server address") },
                             singleLine = true, enabled = !model.busy, modifier = Modifier.fillMaxWidth())
+                        PlainHttpWarning(model.server)
                         OutlinedTextField(model.username, { model.username = it }, label = { Text("Username or email") },
                             singleLine = true, enabled = !model.busy, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(password, { password = it }, label = { Text("Password") },

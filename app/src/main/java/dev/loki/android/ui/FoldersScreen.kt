@@ -162,8 +162,9 @@ fun FoldersScreen(model: AppViewModel, onBrowseFiles: () -> Unit) {
                     onStop = { model.unmap(folder.id) },
                 )
             }
-            item {
-                OutlinedButton(onClick = { creating = true }, enabled = model.canSync, modifier = Modifier.fillMaxWidth()) {
+            // The empty state already offers this button.
+            if (model.canSync && model.folders.isNotEmpty()) item {
+                OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Add, null)
                     Spacer(Modifier.width(8.dp))
                     Text("New server folder")
